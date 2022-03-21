@@ -1,0 +1,98 @@
+{% extends "layout.html" %}
+{% block title %}Home{% endblock %}
+{% block head %}
+  {{ super() }}
+    <style>
+    .login-form {
+        width: 340px;
+        margin: 50px auto;
+        font-size: 15px;
+    }
+    .login-form form {
+        margin-bottom: 15px;
+        background: #f7f7f7;
+        box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
+        padding: 30px;
+    }
+    .login-form h2 {
+        margin: 0 0 15px;
+    }
+    .form-control, .btn {
+        min-height: 38px;
+        border-radius: 2px;
+    }
+    .btn {        
+        font-size: 15px;
+        font-weight: bold;
+    }
+    </style>
+
+    <script type="text/javascript">
+        //https://simonplend.com/how-to-use-fetch-to-post-form-data-as-json-to-your-api/
+        
+        async function postFormDataAsJson({ url, formData }) {
+            const plainFormData = Object.fromEntries(formData.entries());
+            const formDataJsonString = JSON.stringify(plainFormData);
+
+            const fetchOptions = {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                body: formDataJsonString,
+            };
+
+            const response = await fetch(url, fetchOptions);
+
+            if (!response.ok) {
+                const errorMessage = await response.text();
+                throw new Error(errorMessage);
+            }
+
+            return response;
+        }
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+
+            const form = event.currentTarget;
+            const url = form.action;
+
+            try {
+                const formData = new FormData(form);
+                const response = await postFormDataAsJson({ url, formData });
+                replaceFullDom(await response.text())
+            } catch (error) {
+                console.error(error);
+            }
+        }
+    </script>
+{% endblock %}
+
+{% block body %}
+    <script type="text/javascript">
+        document.getElementById("loginform").addEventListener("submit", handleFormSubmit);
+    </script>
+    <div class="login-form">
+        <form id="loginform" action="/main">
+            <h2 class="text-center">Log in</h2>       
+            <div class="form-group">
+                <input name="username" type="text" class="form-control" placeholder="Username" required="required">
+            </div>
+            <div class="form-group">
+                <input name="pw" type="password" class="form-control" placeholder="Password" required="required">
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary btn-block">Log in</button>
+            </div>
+            <div class="clearfix">
+                <label class="float-left form-check-label"><input type="checkbox"> Remember me</label>
+                <a href="#" class="float-right">Forgot Password?</a>
+            </div>        
+        </form>
+        {% if error %}
+            <p class="error text-center"><strong>Error:</strong> {{ error }}</p>
+        {% endif %}
+        <p class="text-center"><a href="#">Create an Account</a></p>
+    </div>
+{% endblock %}

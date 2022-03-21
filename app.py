@@ -22,6 +22,7 @@ session_key_map = {}
 # This route kicks off the JavaScript for key negotiation
 @app.route("/")
 def index():
+    session['uuid'] = uuid4()
     h = b64encode(SHA384.new(bytes(loader(), 'utf-8')).digest()).decode('utf-8')
     return render_template('index.html', sri=h)
 
@@ -68,7 +69,6 @@ def generateSharedKey():
     derived_key = HKDF(shared_secret, 32, b'SaltySalt', SHA256, 1)
 
     # Store the key on server and tie it to a session UUID (sent to client as a cookie)
-    session['uuid'] = uuid4()
     session_key_map[session['uuid']] = derived_key
 
     # As part of Station-To-Station protocol, sign and encrypt a message with our public info and the public info we got
@@ -101,12 +101,16 @@ def decrypt_from_client(cipher_blob):
     # cipher_blob should be a dictionary with two elements: iv and ciphertext
     # the data for those two elements should be Base64-encoded
     # The key is tied to the session UUID
+    if session_key_map.get(session['uuid']) is None:
+        print(f"ERROR: No key found for UUID {session['uuid']}.")
     cipher = AES.new(session_key_map.get(session['uuid']), AES.MODE_CBC, iv=b64decode(cipher_blob.get('iv')))
     ct_bytes = unpad(cipher.decrypt(b64decode(cipher_blob.get('ciphertext'))), AES.block_size)
     return ct_bytes.decode('utf-8')
 
 def encrypt_for_client(content):
     # The key is tied to the session UUID
+    if session_key_map.get(session['uuid']) is None:
+        print(f"ERROR: No key found for UUID {session['uuid']}.")
     cipher = AES.new(session_key_map.get(session['uuid']), AES.MODE_CBC)
     ct_bytes = cipher.encrypt(pad(bytes(content, 'utf-8'), AES.block_size))
     iv = b64encode(cipher.iv).decode('utf-8')

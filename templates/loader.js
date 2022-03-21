@@ -275,14 +275,20 @@ window.addEventListener('load', async (event) => {
     if (localStorage.getItem("server_identity")) {
         const known_identity = localStorage.getItem("server_identity")
         if (known_identity !== pubkey_pem) {
-            alert('You are being spied on!')
-            throw Error("MITM ALERT!")
+            const trust_new_key = window.confirm("The server's public key has changed. You're probably being spied on. Press OK to trust this key or cancel to stop.")
+            if (trust_new_key) {
+                localStorage.setItem("server_identity", pubkey_pem);
+            }
+            else {
+                throw Error("MITM ALERT!");
+            }
+            
         }
     }
     else {
         // Implicitly trust the key if we've never seen it before
         // Ideally we'd be able to give the user some details and ask them to confirm
-        alert("Pretend you could actually validate a cert by looking at it in Base64. We went ahead and accepted it since this is the first time you're connecting.")
+        alert("Since this is your first time connecting, normally you would compare this identity certificate out-of-band. We'll pretend you did that.")
         localStorage.setItem("server_identity", pubkey_pem)
     }
     const serverVerificationKey = await importRsaVerificationKey(localStorage.getItem("server_identity"));

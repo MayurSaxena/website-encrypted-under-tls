@@ -6,5 +6,5 @@ This project is a proof of concept to demonstrate a website that is encrypted in
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-FLASK_ENV=development flask run --port 5001
+FLASK_ENV=development REDISCLOUD_URL=redis://127.0.0.1:6379 flask run --port 5001
 ```

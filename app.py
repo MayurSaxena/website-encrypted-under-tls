@@ -11,18 +11,18 @@ from cryptography.hazmat.primitives import serialization
 from base64 import b64encode, b64decode
 import json
 from os.path import isfile
+from os import environ
 from uuid import uuid4
+import redis
 
 app = Flask(__name__)
+db=redis.from_url(environ['REDISCLOUD_URL']) # For session to key mapping
 # Secret key used for session cookies (there's probably a way to not commit this to Git)
 app.secret_key = bytes(bytearray([10,252,182,84,215,72,9,180,194,51,2,202,217,33,183,5]))
-# This keeps track of symmetric encryption keys for given session UUIDs
-session_key_map = {}
 
 # This route kicks off the JavaScript for key negotiation
 @app.route("/")
 def index():
-    session['uuid'] = uuid4()
     h = b64encode(SHA384.new(bytes(loader(), 'utf-8')).digest()).decode('utf-8')
     return render_template('index.html', sri=h)
 
@@ -49,14 +49,13 @@ def main_stuff():
 @app.route("/logout")
 def logout():
     content = encrypt_for_client(render_template('bye.html'))
-    session_key_map.pop(session['uuid'])
+    db.delete(session['uuid'])
     session.pop('uuid')
     return content
 
 # The endpoint used for key negotiation
 @app.route("/establishkey", methods=["POST"])
 def generateSharedKey():
-    global session_key_map
     # Create an ECDH keypair based on curve P-384
     ecdh_private_key = ec.generate_private_key(ec.SECP384R1())
     # Get our public ECDH value as a PEM
@@ -70,7 +69,8 @@ def generateSharedKey():
     derived_key = HKDF(shared_secret, 32, b'SaltySalt', SHA256, 1)
 
     # Store the key on server and tie it to a session UUID (sent to client as a cookie)
-    session_key_map[session['uuid']] = derived_key
+    session['uuid'] = str(uuid4())
+    db.set(session['uuid'],derived_key)
 
     # As part of Station-To-Station protocol, sign and encrypt a message with our public info and the public info we got
     # SHA-256 hash of our PEM and the received PEM both as hex strings
@@ -102,19 +102,18 @@ def decrypt_from_client(cipher_blob):
     # cipher_blob should be a dictionary with two elements: iv and ciphertext
     # the data for those two elements should be Base64-encoded
     # The key is tied to the session UUID
-    if session_key_map.get(session['uuid']) is None:
+    if db.get(session['uuid']) is None:
         print(f"ERROR: No key found to decrypt for UUID {session['uuid']}.")
-        print(session_key_map)
-    cipher = AES.new(session_key_map.get(session['uuid']), AES.MODE_CBC, iv=b64decode(cipher_blob.get('iv')))
+    cipher = AES.new(db.get(session['uuid']), AES.MODE_CBC, iv=b64decode(cipher_blob.get('iv')))
     ct_bytes = unpad(cipher.decrypt(b64decode(cipher_blob.get('ciphertext'))), AES.block_size)
     return ct_bytes.decode('utf-8')
 
 def encrypt_for_client(content):
     # The key is tied to the session UUID
-    if session_key_map.get(session['uuid']) is None:
+    if db.get(session['uuid']) is None:
         print(f"ERROR: No key found to encrypt for UUID {session['uuid']}.")
-        print(session_key_map)
-    cipher = AES.new(session_key_map.get(session['uuid']), AES.MODE_CBC)
+
+    cipher = AES.new(db.get(session['uuid']), AES.MODE_CBC)
     ct_bytes = cipher.encrypt(pad(bytes(content, 'utf-8'), AES.block_size))
     iv = b64encode(cipher.iv).decode('utf-8')
     ct = b64encode(ct_bytes).decode('utf-8')

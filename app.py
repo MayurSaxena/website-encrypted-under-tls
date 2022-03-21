@@ -56,6 +56,7 @@ def logout():
 # The endpoint used for key negotiation
 @app.route("/establishkey", methods=["POST"])
 def generateSharedKey():
+    global session_key_map
     # Create an ECDH keypair based on curve P-384
     ecdh_private_key = ec.generate_private_key(ec.SECP384R1())
     # Get our public ECDH value as a PEM
@@ -102,7 +103,8 @@ def decrypt_from_client(cipher_blob):
     # the data for those two elements should be Base64-encoded
     # The key is tied to the session UUID
     if session_key_map.get(session['uuid']) is None:
-        print(f"ERROR: No key found for UUID {session['uuid']}.")
+        print(f"ERROR: No key found to decrypt for UUID {session['uuid']}.")
+        print(session_key_map)
     cipher = AES.new(session_key_map.get(session['uuid']), AES.MODE_CBC, iv=b64decode(cipher_blob.get('iv')))
     ct_bytes = unpad(cipher.decrypt(b64decode(cipher_blob.get('ciphertext'))), AES.block_size)
     return ct_bytes.decode('utf-8')
@@ -110,7 +112,8 @@ def decrypt_from_client(cipher_blob):
 def encrypt_for_client(content):
     # The key is tied to the session UUID
     if session_key_map.get(session['uuid']) is None:
-        print(f"ERROR: No key found for UUID {session['uuid']}.")
+        print(f"ERROR: No key found to encrypt for UUID {session['uuid']}.")
+        print(session_key_map)
     cipher = AES.new(session_key_map.get(session['uuid']), AES.MODE_CBC)
     ct_bytes = cipher.encrypt(pad(bytes(content, 'utf-8'), AES.block_size))
     iv = b64encode(cipher.iv).decode('utf-8')

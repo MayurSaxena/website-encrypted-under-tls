@@ -16,6 +16,11 @@ from uuid import uuid4
 import redis
 
 app = Flask(__name__)
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+)
 db=redis.from_url(environ['REDISCLOUD_URL']) # For session to key mapping
 # Secret key used for session cookies (there's probably a way to not commit this to Git)
 app.secret_key = bytes(bytearray([10,252,182,84,215,72,9,180,194,51,2,202,217,33,183,5]))

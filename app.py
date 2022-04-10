@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, request
+from flask import Flask, Response, render_template, session, request
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256, SHA384
 from Crypto.Protocol.KDF import HKDF
@@ -28,13 +28,15 @@ app.secret_key = bytes(bytearray([10,252,182,84,215,72,9,180,194,51,2,202,217,33
 # This route kicks off the JavaScript for key negotiation
 @app.route("/")
 def index():
-    h = b64encode(SHA384.new(bytes(loader(), 'utf-8')).digest()).decode('utf-8')
+    h = b64encode(SHA384.new(bytes(loader(content_only=True), 'utf-8'))
+                        .digest()).decode('utf-8')
     return render_template('index.html', sri=h)
 
 # Injects the JavaScript with our public RSA key (for identity)
 @app.route("/loader")
-def loader():
-    return render_template('loader.js', pubkey_b64=get_pubkey_b64())
+def loader(content_only=False):
+    js = render_template('loader.js', pubkey_b64=get_pubkey_b64())
+    return js if content_only else Response(js, mimetype='text/javascript')
 
 # If it's a GET to main, just serve the content (encrypted)
 # If it's a POST, that means someone's trying to log in probably, so decrypt and process
